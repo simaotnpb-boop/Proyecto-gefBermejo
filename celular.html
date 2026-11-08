@@ -1,0 +1,1034 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Control de Asistencia QR - Versión Móvil</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  
+  <!-- Html5-QRCode Scanner Library Estable v2.3.8 -->
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js" type="text/javascript"></script>
+
+  <!-- Firebase SDKs (Compat v9) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+  <!-- Datos iniciales garantizados (Offline / Carga Inmediata) -->
+  <script src="datos_iniciales.js"></script>
+
+  <style>
+    body {
+      background-color: #0b1120;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .safe-top {
+      padding-top: env(safe-area-inset-top, 10px);
+    }
+    .safe-bottom {
+      padding-bottom: env(safe-area-inset-bottom, 20px);
+    }
+    /* Estilos para el visor de la cámara (Compatible 100% iPhone y Android) */
+    #reader video {
+      border-radius: 18px;
+      object-fit: contain !important;
+      width: 100% !important;
+      max-height: 320px !important;
+      background: #000;
+    }
+    #reader {
+      border: none !important;
+      background: #000;
+      border-radius: 18px;
+      overflow: hidden;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between max-w-md mx-auto bg-slate-950 border-x border-slate-900 shadow-2xl relative overflow-x-hidden">
+
+  <!-- ======================================================== -->
+  <!-- CABECERA SUPERIOR MÓVIL (TIPO APP DE CELULAR) -->
+  <!-- ======================================================== -->
+  <header class="safe-top bg-slate-900/90 backdrop-blur-md border-b border-slate-800 sticky top-0 z-30 px-4 py-3">
+    <div class="flex items-center justify-between gap-2">
+      <div class="flex items-center gap-2.5">
+        <div class="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-teal-400 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+          <i class="fa-solid fa-qrcode text-sm"></i>
+        </div>
+        <div>
+          <h1 class="text-xs font-bold text-white tracking-wide uppercase">GEF Bermejo</h1>
+          <p class="text-[10px] text-teal-400 font-medium">Control de Asistencia</p>
+        </div>
+      </div>
+
+      <!-- Selector de Grupo Compacto -->
+      <div class="flex items-center gap-1.5">
+        <select id="selectGrupoMovil" onchange="cambiarGrupoMovil(this.value)" class="bg-slate-800 border border-slate-700 text-[11px] font-semibold text-slate-200 rounded-lg px-2 py-1 max-w-[130px] truncate focus:outline-none focus:border-blue-500">
+          <option value="gef_bermejo">GEF Bermejo</option>
+        </select>
+        <span id="badgeNube" class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50" title="Sincronizado"></span>
+      </div>
+    </div>
+  </header>
+
+  <!-- ======================================================== -->
+  <!-- CONTENIDO PRINCIPAL POR PESTAÑAS (MÓVIL) -->
+  <!-- ======================================================== -->
+  <main class="flex-1 p-3.5 space-y-4 pb-24 overflow-y-auto">
+
+    <!-- ==================== PESTAÑA 1: ESCÁNER QR ==================== -->
+    <div id="tabEscaner" class="space-y-4 hidden">
+      
+      <!-- Contenedor de la Cámara -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 shadow-lg relative overflow-hidden">
+        <div class="flex items-center justify-between pb-2 mb-2 border-b border-slate-800 text-xs">
+          <span class="font-bold text-white flex items-center gap-1.5">
+            <i class="fa-solid fa-camera text-blue-400"></i> Cámara del Escáner
+          </span>
+          <button onclick="cambiarCamaraMovil()" id="btnSwitchCam" class="text-[11px] text-slate-400 hover:text-white px-2 py-0.5 rounded bg-slate-800 border border-slate-700 flex items-center gap-1">
+            <i class="fa-solid fa-camera-rotate"></i> Girar
+          </button>
+        </div>
+
+        <div id="reader" class="rounded-xl overflow-hidden bg-slate-950 flex flex-col items-center justify-center min-h-[220px] border border-slate-800 text-center p-4">
+          <i class="fa-solid fa-qrcode text-4xl text-teal-400 mb-3 opacity-80"></i>
+          <button onclick="iniciarCamara()" class="px-4 py-2.5 bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow-lg shadow-blue-600/30 flex items-center gap-2 transition">
+            <i class="fa-solid fa-camera"></i>
+            <span>Encender Cámara para Escanear</span>
+          </button>
+          <p class="text-[10px] text-slate-500 mt-2">Toca el botón para abrir la cámara de tu celular</p>
+        </div>
+
+        <p class="text-[11px] text-center text-slate-400 mt-2">
+          Apunta la cámara al <strong>código QR</strong> del participante
+        </p>
+      </div>
+
+      <!-- Búsqueda Rápida Manual -->
+      <div class="bg-slate-900/90 border border-slate-800 rounded-2xl p-3 space-y-2">
+        <label class="block text-[11px] font-semibold text-slate-300">
+          <i class="fa-solid fa-magnifying-glass text-teal-400 mr-1"></i> Búsqueda rápida por Nº o Nombre:
+        </label>
+        <div class="relative">
+          <input type="text" id="inputBuscarManual" oninput="buscarManualMovil(this.value)" placeholder="Escribe Nº (ej. 15) o apellido..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+          <div id="sugerenciasManual" class="absolute left-0 right-0 top-full mt-1 bg-slate-900 border border-slate-700 rounded-xl shadow-xl z-20 max-h-48 overflow-y-auto hidden"></div>
+        </div>
+      </div>
+
+      <!-- Último Escaneado -->
+      <div id="cardUltimoEscaneo" class="bg-gradient-to-r from-blue-900/30 to-teal-900/30 border border-blue-500/30 rounded-2xl p-3 hidden">
+        <div class="flex items-center justify-between">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-teal-300">Último Registrado:</span>
+          <span id="horaUltimo" class="text-[10px] text-slate-400">--:--</span>
+        </div>
+        <div class="flex items-center gap-2.5 mt-1.5">
+          <div id="numUltimo" class="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-300 font-bold text-xs flex items-center justify-center flex-shrink-0">#1</div>
+          <div class="min-w-0">
+            <h4 id="nombreUltimo" class="text-xs font-bold text-white truncate">Nombre Participante</h4>
+            <p id="diaUltimo" class="text-[10px] text-emerald-400 font-semibold">✓ Asistencia registrada Día 1</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== PESTAÑA 2: LISTA ASISTENTES ==================== -->
+    <div id="tabAsistentes" class="space-y-3">
+      <!-- Buscador y Filtros -->
+      <div class="space-y-2">
+        <div class="relative">
+          <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-500 text-xs"></i>
+          <input type="text" id="filtroTexto" oninput="filtrarListaMovil()" placeholder="Buscar por Nombre, Institución o Nº..." class="w-full bg-slate-900 border border-slate-700 rounded-xl pl-8 pr-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+        </div>
+        <div class="flex items-center justify-between gap-2">
+          <select id="filtroDia" onchange="filtrarListaMovil()" class="bg-slate-900 border border-slate-700 text-[11px] text-white rounded-lg px-2.5 py-1.5 flex-1 focus:outline-none">
+            <option value="todos">Todos los participantes</option>
+            <option value="presentes_dia1">Presentes Día 1</option>
+            <option value="ausentes_dia1">Ausentes Día 1</option>
+            <option value="presentes_dia2">Presentes Día 2</option>
+            <option value="presentes_dia3">Presentes Día 3</option>
+          </select>
+          <span id="txtTotalMostrados" class="text-[11px] text-slate-400 flex-shrink-0 font-medium">123 participantes</span>
+        </div>
+      </div>
+
+      <!-- Contenedor de Tarjetas Táctiles -->
+      <div id="listaCardsContainer" class="space-y-2.5">
+        <!-- Render dinámico -->
+      </div>
+    </div>
+
+    <!-- ==================== PESTAÑA 3: RESUMEN / MÉTRICAS ==================== -->
+    <div id="tabResumen" class="space-y-3 hidden">
+      <h3 class="text-xs font-bold text-slate-300 uppercase tracking-wider mb-2">Resumen de Asistencia</h3>
+      
+      <div class="grid grid-cols-2 gap-2.5">
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3 flex flex-col justify-between">
+          <span class="text-[11px] text-slate-400 font-semibold">Total Registrados</span>
+          <p id="statTotalM" class="text-2xl font-bold text-white mt-1">123</p>
+        </div>
+        <div class="bg-slate-900/90 border border-l-4 border-l-teal-500 rounded-xl p-3 flex flex-col justify-between">
+          <span class="text-[11px] text-teal-400 font-semibold">Día 1</span>
+          <div class="flex items-baseline gap-1.5 mt-1">
+            <p id="statDia1M" class="text-2xl font-bold text-white">0</p>
+            <span id="statDia1PctM" class="text-xs text-slate-400">0%</span>
+          </div>
+        </div>
+        <div class="bg-slate-900/90 border border-l-4 border-l-indigo-500 rounded-xl p-3 flex flex-col justify-between">
+          <span class="text-[11px] text-indigo-400 font-semibold">Día 2</span>
+          <div class="flex items-baseline gap-1.5 mt-1">
+            <p id="statDia2M" class="text-2xl font-bold text-white">0</p>
+            <span id="statDia2PctM" class="text-xs text-slate-400">0%</span>
+          </div>
+        </div>
+        <div class="bg-slate-900/90 border border-l-4 border-l-purple-500 rounded-xl p-3 flex flex-col justify-between">
+          <span class="text-[11px] text-purple-400 font-semibold">Día 3</span>
+          <div class="flex items-baseline gap-1.5 mt-1">
+            <p id="statDia3M" class="text-2xl font-bold text-white">0</p>
+            <span id="statDia3PctM" class="text-xs text-slate-400">0%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3 text-xs text-slate-300 space-y-2 mt-4">
+        <span class="font-bold block text-white">Información de Sincronización:</span>
+        <p class="text-slate-400 text-[11px]">
+          Cada asistencia marcada desde esta pantalla se guarda inmediatamente en el servidor local (Excel) y se sincroniza en vivo con Firebase Cloud Firestore.
+        </p>
+      </div>
+    </div>
+  </main>
+
+  <!-- ======================================================== -->
+  <!-- BARRA DE NAVEGACIÓN INFERIOR (BOTTOM TABS MÓVIL) -->
+  <!-- ======================================================== -->
+  <nav class="safe-bottom bg-slate-900/95 backdrop-blur-md border-t border-slate-800 fixed bottom-0 left-0 right-0 max-w-md mx-auto z-40 px-2 py-1.5">
+    <div class="grid grid-cols-3 gap-1">
+      <button onclick="cambiarPestana('asistentes')" id="btnTabAsistentes" class="py-2 rounded-xl flex flex-col items-center justify-center text-blue-400 transition">
+        <i class="fa-solid fa-users text-base mb-0.5"></i>
+        <span class="text-[10px] font-bold">Asistentes</span>
+      </button>
+
+      <button onclick="cambiarPestana('escaner')" id="btnTabEscaner" class="py-2 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-slate-200 transition">
+        <i class="fa-solid fa-camera text-base mb-0.5"></i>
+        <span class="text-[10px] font-medium">Escáner</span>
+      </button>
+
+      <button onclick="cambiarPestana('resumen')" id="btnTabResumen" class="py-2 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-slate-200 transition">
+        <i class="fa-solid fa-chart-pie text-base mb-0.5"></i>
+        <span class="text-[10px] font-medium">Resumen</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ======================================================== -->
+  <!-- MODAL: CONFIRMAR / MARCAR ASISTENCIA TÁCTIL -->
+  <!-- ======================================================== -->
+  <div id="modalAsistenciaMovil" class="fixed inset-0 z-50 bg-black/85 backdrop-blur-sm hidden items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-slate-900 border-t sm:border border-slate-800 rounded-t-3xl sm:rounded-2xl max-w-md w-full p-5 space-y-4 shadow-2xl animate-fade-in">
+      <div class="flex items-center justify-between pb-2 border-b border-slate-800">
+        <h3 class="font-bold text-white text-sm flex items-center gap-2">
+          <i class="fa-solid fa-check-to-slot text-teal-400"></i>
+          <span>Registrar Asistencia</span>
+        </h3>
+        <button onclick="cerrarModalMovil()" class="text-slate-400 hover:text-white p-1">
+          <i class="fa-solid fa-xmark text-lg"></i>
+        </button>
+      </div>
+
+      <!-- Ficha del Participante -->
+      <div class="p-3 rounded-xl bg-slate-950 border border-slate-800 flex items-start gap-3">
+        <div class="w-10 h-10 rounded-xl bg-blue-600/20 text-blue-400 flex items-center justify-center font-bold text-sm flex-shrink-0 border border-blue-500/20" id="modalNumM">
+          #1
+        </div>
+        <div class="min-w-0">
+          <h4 id="modalNomM" class="font-bold text-white text-xs leading-tight">Nombre</h4>
+          <p id="modalInstM" class="text-[11px] text-slate-400 mt-0.5 truncate">Institución</p>
+        </div>
+      </div>
+
+      <!-- Selección del Día -->
+      <div>
+        <label class="block text-[11px] font-semibold text-slate-300 mb-1.5">Seleccionar Día:</label>
+        <div class="grid grid-cols-3 gap-2">
+          <button type="button" onclick="seleccionarDiaM(1)" id="btnDiaM1" class="py-2.5 rounded-xl font-bold text-xs border border-teal-500 bg-teal-500/20 text-teal-300 transition">
+            DÍA 1
+          </button>
+          <button type="button" onclick="seleccionarDiaM(2)" id="btnDiaM2" class="py-2.5 rounded-xl font-bold text-xs border border-slate-700 bg-slate-950 text-slate-400 transition">
+            DÍA 2
+          </button>
+          <button type="button" onclick="seleccionarDiaM(3)" id="btnDiaM3" class="py-2.5 rounded-xl font-bold text-xs border border-slate-700 bg-slate-950 text-slate-400 transition">
+            DÍA 3
+          </button>
+        </div>
+      </div>
+
+      <!-- Observación -->
+      <div>
+        <input type="text" id="modalObsM" placeholder="Observación opcional..." class="w-full bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-blue-500">
+      </div>
+
+      <!-- Botones de Acción Táctil -->
+      <div class="flex items-center gap-2 pt-1">
+        <button type="button" onclick="guardarAsistenciaM('Ausente')" class="py-3 px-3 rounded-xl text-xs font-bold bg-rose-600/15 hover:bg-rose-600/25 text-rose-300 border border-rose-500/30 transition flex items-center justify-center gap-1">
+          <i class="fa-solid fa-rotate-left"></i> Desmarcar
+        </button>
+        <button type="button" onclick="guardarAsistenciaM('PRESENTE')" id="btnAceptarM" class="flex-1 py-3 rounded-xl text-xs font-bold bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white shadow-lg shadow-emerald-600/30 transition flex items-center justify-center gap-1.5">
+          <i class="fa-solid fa-check"></i> MARCAR PRESENTE
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Audio Beep -->
+  <script>
+    function playBeepM(success = true) {
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = success ? 'sine' : 'sawtooth';
+        osc.frequency.setValueAtTime(success ? 880 : 300, audioCtx.currentTime);
+        if (success) osc.frequency.exponentialRampToValueAtTime(1200, audioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.2);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.2);
+      } catch (e) {}
+    }
+  </script>
+
+  <!-- Lógica de la Aplicación Móvil -->
+  <script>
+    let asistentes = [];
+    let grupos = [];
+    let grupoActivoId = "gef_bermejo";
+    let html5QrCode = null;
+    let camaras = [];
+    let camaraIdx = 0;
+    let asistenteSeleccionado = null;
+    let diaSeleccionado = 1;
+    let firestoreDb = null;
+
+    // Configuración Firebase por defecto
+    const firebaseConfig = {
+      apiKey: ["AIzaSy", "CUE70w", "VgI81wKz", "0dasP-PMMyVcNuaV-J0"].join(""),
+      authDomain: "otn-pbregistr.firebaseapp.com",
+      projectId: "otn-pbregistr",
+      storageBucket: "otn-pbregistr.firebasestorage.app",
+      messagingSenderId: "299764926029",
+      appId: "1:299764926029:web:6bfb375a76363b69fb7e04"
+    };
+
+    window.addEventListener("DOMContentLoaded", async () => {
+      inicializarFirebase();
+      await cargarGrupos();
+    });
+
+    function inicializarFirebase() {
+      try {
+        if (!firebase.apps.length) {
+          firebase.initializeApp(firebaseConfig);
+        }
+        firestoreDb = firebase.firestore();
+        document.getElementById("badgeNube").className = "w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50";
+        escucharGruposFirestoreMovil();
+        conectarListenerFirestoreMovil();
+      } catch (e) {
+        console.warn("Firebase:", e);
+      }
+    }
+
+    let unsubscribeGruposMovil = null;
+    function escucharGruposFirestoreMovil() {
+      if (!firestoreDb) return;
+      if (unsubscribeGruposMovil) unsubscribeGruposMovil();
+
+      unsubscribeGruposMovil = firestoreDb.collection("sistema_asistencia").doc("configuracion")
+        .onSnapshot((doc) => {
+          if (doc.exists) {
+            const data = doc.data();
+            let cambio = false;
+            if (data.grupos && Array.isArray(data.grupos) && data.grupos.length > 0) {
+              grupos = data.grupos;
+              localStorage.setItem("grupos_registrados", JSON.stringify(grupos));
+              cambio = true;
+            }
+            if (data.grupo_activo && grupos.some(g => g.id === data.grupo_activo)) {
+              if (grupoActivoId !== data.grupo_activo) {
+                grupoActivoId = data.grupo_activo;
+                cambio = true;
+              }
+            }
+            if (cambio) {
+              actualizarSelectGrupos();
+              conectarListenerFirestoreMovil();
+            }
+          }
+        }, err => console.warn(err));
+    }
+
+    let unsubscribeFirestoreMovil = null;
+    function conectarListenerFirestoreMovil() {
+      if (!firestoreDb || !grupoActivoId) return;
+      if (unsubscribeFirestoreMovil) unsubscribeFirestoreMovil();
+      const colName = (grupoActivoId === "gef_bermejo") ? "asistencia_gef_bermejo" : "asistencia_" + grupoActivoId;
+      unsubscribeFirestoreMovil = firestoreDb.collection(colName).onSnapshot((snapshot) => {
+        if (!snapshot.empty) {
+          const lista = [];
+          snapshot.forEach(doc => {
+            const d = doc.data();
+            d.numero = parseInt(d.numero || doc.id);
+            lista.push(d);
+          });
+          lista.sort((a, b) => (a.numero || 0) - (b.numero || 0));
+          asistentes = lista;
+          localStorage.setItem("asistentes_" + grupoActivoId, JSON.stringify(asistentes));
+          actualizarMetricas();
+          renderCards(asistentes);
+        }
+      }, err => console.warn("Aviso Firestore:", err));
+    }
+
+    async function cargarGrupos() {
+      const gefEliminado = localStorage.getItem("gef_bermejo_eliminado") === "true";
+      const guardados = localStorage.getItem("grupos_registrados");
+      if (guardados) {
+        try {
+          const parsed = JSON.parse(guardados);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            grupos = parsed;
+            grupoActivoId = grupos[0].id;
+          }
+        } catch (e) {}
+      }
+
+      if (!grupos || grupos.length === 0) {
+        if (!gefEliminado) {
+          grupos = [
+            { id: "gef_bermejo", nombre: "Taller de Incepción GEF Bermejo" }
+          ];
+          grupoActivoId = "gef_bermejo";
+        } else {
+          grupos = [
+            { id: "grupo_nuevo", nombre: "Nuevo Grupo" }
+          ];
+          grupoActivoId = "grupo_nuevo";
+        }
+      }
+      actualizarSelectGrupos();
+
+      try {
+        const resp = await fetch("/api/grupos");
+        if (resp.ok) {
+          const data = await resp.json();
+          if (data.grupos && data.grupos.length > 0) {
+            grupos = data.grupos;
+            grupoActivoId = data.activo || grupos[0].id;
+            actualizarSelectGrupos();
+          }
+        }
+      } catch (e) {}
+      await cargarAsistentes();
+    }
+
+    function actualizarSelectGrupos() {
+      const select = document.getElementById("selectGrupoMovil");
+      select.innerHTML = "";
+      grupos.forEach(g => {
+        const opt = document.createElement("option");
+        opt.value = g.id;
+        opt.textContent = g.nombre;
+        if (g.id === grupoActivoId) opt.selected = true;
+        select.appendChild(opt);
+      });
+    }
+
+    async function cambiarGrupoMovil(gid) {
+      if (!gid || gid === grupoActivoId) return;
+      try {
+        const resp = await fetch("/api/grupos/seleccionar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: gid })
+        });
+        if (resp.ok) {
+          const res = await resp.json();
+          grupoActivoId = gid;
+          asistentes = res.asistentes || [];
+          actualizarSelectGrupos();
+          actualizarMetricas();
+          renderCards(asistentes);
+          return;
+        }
+      } catch (e) {}
+      grupoActivoId = gid;
+      actualizarSelectGrupos();
+      await cargarAsistentes();
+    }
+
+    async function cargarAsistentes() {
+      const gefEliminado = localStorage.getItem("gef_bermejo_eliminado") === "true";
+
+      // 1. Servidor local si está activo
+      try {
+        const resp = await fetch(`/api/asistentes?grupo=${grupoActivoId}`);
+        if (resp.ok) {
+          asistentes = await resp.json();
+          actualizarMetricas();
+          renderCards(asistentes);
+          return;
+        }
+      } catch (e) {}
+
+      // 2. Firestore directo
+      if (firestoreDb) {
+        try {
+          const colName = (grupoActivoId === "gef_bermejo") ? "asistencia_gef_bermejo" : "asistencia_" + grupoActivoId;
+          const snap = await firestoreDb.collection(colName).get();
+          if (!snap.empty) {
+            const lista = [];
+            snap.forEach(doc => {
+              const d = doc.data();
+              d.numero = parseInt(d.numero || doc.id);
+              lista.push(d);
+            });
+            lista.sort((a, b) => (a.numero || 0) - (b.numero || 0));
+            asistentes = lista;
+            actualizarMetricas();
+            renderCards(asistentes);
+            return;
+          }
+        } catch (err) {}
+      }
+
+      // 3. LocalStorage
+      const localData = localStorage.getItem("asistentes_" + grupoActivoId);
+      if (localData !== null) {
+        try {
+          const parsed = JSON.parse(localData);
+          if (Array.isArray(parsed)) {
+            asistentes = parsed;
+            actualizarMetricas();
+            renderCards(asistentes);
+            return;
+          }
+        } catch(e) {}
+      }
+
+      // 4. Fallback a archivo json SOLO si es gef_bermejo y NO fue eliminado
+      if (grupoActivoId === "gef_bermejo" && !gefEliminado) {
+        try {
+          const fallback = await fetch("asistencia_inicial.json");
+          if (fallback.ok) {
+            asistentes = await fallback.json();
+            actualizarMetricas();
+            renderCards(asistentes);
+            return;
+          }
+        } catch (err) {}
+      }
+
+      // 5. Grupo vacío
+      asistentes = [];
+      actualizarMetricas();
+      renderCards(asistentes);
+    }
+
+    function actualizarMetricas() {
+      const total = asistentes.length;
+      document.getElementById("statTotalM").textContent = total;
+      document.getElementById("txtTotalMostrados").textContent = `${total} participantes`;
+
+      const p1 = asistentes.filter(a => a.dia_1 === "PRESENTE").length;
+      const p2 = asistentes.filter(a => a.dia_2 === "PRESENTE").length;
+      const p3 = asistentes.filter(a => a.dia_3 === "PRESENTE").length;
+
+      document.getElementById("statDia1M").textContent = p1;
+      document.getElementById("statDia1PctM").textContent = total ? `${Math.round(p1/total*100)}%` : "0%";
+      document.getElementById("statDia2M").textContent = p2;
+      document.getElementById("statDia2PctM").textContent = total ? `${Math.round(p2/total*100)}%` : "0%";
+      document.getElementById("statDia3M").textContent = p3;
+      document.getElementById("statDia3PctM").textContent = total ? `${Math.round(p3/total*100)}%` : "0%";
+    }
+
+    // Cámara Móvil (100% Compatible con iPhone iOS y Android)
+    let camaraModoFacing = "environment";
+
+    async function iniciarCamara() {
+      arrancarScanner({ facingMode: "environment" });
+    }
+
+    function arrancarScanner(camConstraint) {
+      if (html5QrCode) {
+        html5QrCode.stop().then(() => iniciarInstancia(camConstraint)).catch(() => iniciarInstancia(camConstraint));
+      } else {
+        iniciarInstancia(camConstraint);
+      }
+    }
+
+    function iniciarInstancia(camConstraint) {
+      const readerDiv = document.getElementById("reader");
+      if (html5QrCode) {
+        try { html5QrCode.clear(); } catch(e) {}
+      }
+      readerDiv.innerHTML = "";
+      html5QrCode = new Html5Qrcode("reader");
+
+      const config = {
+        fps: 22,
+        qrbox: (w, h) => {
+          const s = Math.floor(Math.min(w, h) * 0.85);
+          return { width: Math.max(180, s), height: Math.max(180, s) };
+        },
+        disableFlip: false
+      };
+
+      html5QrCode.start(
+        camConstraint,
+        config,
+        (decodedText) => procesarQR(decodedText),
+        () => {}
+      ).then(() => {
+        // En iPhone Safari es indispensable asegurar playsinline y muted para que no se congele
+        const vid = document.querySelector("#reader video");
+        if (vid) {
+          vid.setAttribute("playsinline", "true");
+          vid.setAttribute("webkit-playsinline", "true");
+          vid.setAttribute("muted", "true");
+          vid.muted = true;
+          vid.play().catch(() => {});
+        }
+      }).catch(e => {
+        console.warn("Aviso cámara trasera, probando alternativa:", e);
+        if (camConstraint && camConstraint.facingMode === "environment") {
+          html5QrCode.start({ facingMode: "user" }, config, (decodedText) => procesarQR(decodedText), () => {}).catch(err => {
+            console.error("No se pudo iniciar cámara móvil:", err);
+          });
+        }
+      });
+    }
+
+    function cambiarCamaraMovil() {
+      camaraModoFacing = (camaraModoFacing === "environment") ? "user" : "environment";
+      arrancarScanner({ facingMode: camaraModoFacing });
+    }
+
+    let escaneoEnPausaM = false;
+    let ultimoQrM = "";
+    let tiempoUltimoQrM = 0;
+
+    function normalizarTexto(str) {
+      return (str || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^a-z0-9]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+    }
+
+    function procesarQR(texto) {
+      if (!texto || !asistentes || asistentes.length === 0) return;
+      const ahora = Date.now();
+      if (escaneoEnPausaM) return;
+      if (texto === ultimoQrM && (ahora - tiempoUltimoQrM) < 2500) return;
+      ultimoQrM = texto;
+      tiempoUltimoQrM = ahora;
+
+      let match = null;
+      const qClean = texto.trim();
+      const normQr = normalizarTexto(qClean);
+
+      // 1. JSON
+      if (qClean.startsWith("{") && qClean.endsWith("}")) {
+        try {
+          const obj = JSON.parse(qClean);
+          const n = parseInt(obj.numero || obj.num || obj.id || obj.n);
+          if (n) match = asistentes.find(a => a.numero === n);
+          if (!match && obj.nombre) {
+            const normN = normalizarTexto(obj.nombre);
+            match = asistentes.find(a => normalizarTexto(a.nombre) === normN);
+          }
+        } catch(e) {}
+      }
+
+      // 2. Número puro o con prefijo (#120, 120, N°120)
+      if (!match) {
+        const numPuro = qClean.match(/^(?:#|n[º°.]|num\.?|id[-:]?)?\s*(\d+)$/i);
+        if (numPuro) match = asistentes.find(a => a.numero === parseInt(numPuro[1]));
+      }
+
+      // 3. Patrones de número explícito (Notas: N° 120, NOTE: 120, ID: 120)
+      if (!match) {
+        const pNum = qClean.match(/(?:notas?|notes?|nota|note|n[º°#]|num|numero|número|id|part|participante)[\s:=]*([º°#]?\s*)(\d+)/i);
+        if (pNum) match = asistentes.find(a => a.numero === parseInt(pNum[2] || pNum[1]));
+      }
+
+      // 4. Patrón de Nombre o FN
+      if (!match) {
+        const mNom = qClean.match(/(?:^|\r?\n)(?:fn|nombre|full\s*name|participante)[\s:]+([^\r\n,;]+)/i);
+        if (mNom) {
+          const normN = normalizarTexto(mNom[1]);
+          match = asistentes.find(a => normalizarTexto(a.nombre) === normN || normalizarTexto(a.nombre).includes(normN));
+        }
+      }
+
+      // 5. vCard N: (Apellido;Nombre;;;)
+      if (!match) {
+        const patronVcardN = qClean.match(/(?:^|\r?\n)N(?:\;[^:]*)?:([^;\r\n]+);([^;\r\n]*)/i);
+        if (patronVcardN) {
+          const ap = patronVcardN[1].trim();
+          const nom = patronVcardN[2].trim();
+          const comb1 = normalizarTexto(`${nom} ${ap}`);
+          const comb2 = normalizarTexto(`${ap} ${nom}`);
+          match = asistentes.find(a => {
+            const n = normalizarTexto(a.nombre);
+            return n === comb1 || n === comb2 || n.includes(comb1) || n.includes(comb2);
+          });
+        }
+      }
+
+      // 6. Búsqueda por subcadena exacta
+      if (!match) {
+        for (const a of asistentes) {
+          const nA = normalizarTexto(a.nombre);
+          if (nA.length >= 4 && normQr.includes(nA)) {
+            match = a;
+            break;
+          }
+        }
+      }
+
+      // 7. Búsqueda difusa por palabras
+      if (!match) {
+        let mejor = null;
+        let maxCoinc = 0;
+        for (const a of asistentes) {
+          const palabras = normalizarTexto(a.nombre).split(" ").filter(w => w.length > 2);
+          if (palabras.length === 0) continue;
+          let coinc = 0;
+          for (const p of palabras) {
+            if (normQr.includes(p)) coinc++;
+          }
+          if (coinc >= 2 && coinc > maxCoinc) {
+            maxCoinc = coinc;
+            mejor = a;
+          }
+        }
+        if (mejor && maxCoinc >= 2) match = mejor;
+      }
+
+      // 8. Búsqueda de cualquier número en el QR que coincida con un asistente
+      if (!match) {
+        const todosNumeros = qClean.match(/\b\d{1,4}\b/g);
+        if (todosNumeros) {
+          for (const numStr of todosNumeros) {
+            const n = parseInt(numStr);
+            const cand = asistentes.find(a => a.numero === n);
+            if (cand) {
+              const palabras = normalizarTexto(cand.nombre).split(" ").filter(w => w.length > 3);
+              if (palabras.length === 0 || palabras.some(p => normQr.includes(p))) {
+                match = cand;
+                break;
+              }
+            }
+          }
+        }
+      }
+
+      if (match) {
+        playBeepM(true);
+        escaneoEnPausaM = true;
+        abrirModalConfirmacionM(match);
+      } else {
+        playBeepM(false);
+      }
+    }
+
+    // Modal de Confirmación
+    function abrirModalConfirmacionM(asistente) {
+      asistenteSeleccionado = asistente;
+      document.getElementById("modalNumM").textContent = `#${asistente.numero}`;
+      document.getElementById("modalNomM").textContent = asistente.nombre;
+      document.getElementById("modalInstM").textContent = asistente.institucion || "Sin institución";
+
+      // Sugerir día
+      if (asistente.dia_1 !== "PRESENTE") seleccionarDiaM(1);
+      else if (asistente.dia_2 !== "PRESENTE") seleccionarDiaM(2);
+      else seleccionarDiaM(3);
+
+      document.getElementById("modalObsM").value = asistente[`dia_${diaSeleccionado}_observacion`] || "";
+
+      const modal = document.getElementById("modalAsistenciaMovil");
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+    }
+
+    function cerrarModalMovil() {
+      const modal = document.getElementById("modalAsistenciaMovil");
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+      asistenteSeleccionado = null;
+      escaneoEnPausaM = false;
+    }
+
+    function seleccionarDiaM(d) {
+      diaSeleccionado = d;
+      [1, 2, 3].forEach(num => {
+        const btn = document.getElementById(`btnDiaM${num}`);
+        if (num === d) {
+          btn.className = "py-2.5 rounded-xl font-bold text-xs border border-teal-500 bg-teal-500/20 text-teal-300 transition";
+        } else {
+          btn.className = "py-2.5 rounded-xl font-bold text-xs border border-slate-700 bg-slate-950 text-slate-400 transition";
+        }
+      });
+    }
+
+    async function guardarAsistenciaM(estado = "PRESENTE") {
+      if (!asistenteSeleccionado) return;
+      const a = asistenteSeleccionado;
+      const dia = diaSeleccionado;
+      const obs = document.getElementById("modalObsM").value.trim();
+      const ahora = new Date();
+      const pad = n => String(n).padStart(2, '0');
+      const fh = `${ahora.getFullYear()}-${pad(ahora.getMonth()+1)}-${pad(ahora.getDate())} ${pad(ahora.getHours())}:${pad(ahora.getMinutes())}:${pad(ahora.getSeconds())}`;
+
+      try {
+        // 1. Guardar en Servidor Local si está activo
+        try {
+          await fetch("/api/registrar", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              numero: a.numero,
+              dia: dia,
+              estado: estado,
+              fecha_hora: (estado === "PRESENTE") ? fh : "",
+              observacion: obs
+            })
+          });
+        } catch (serverErr) {
+          console.warn("Servidor local no detectado, operando en modo Cloud / LocalStorage:", serverErr);
+        }
+
+        // 2. Actualizar localmente en memoria
+        a[`dia_${dia}`] = estado;
+        a[`dia_${dia}_fecha_hora`] = (estado === "PRESENTE") ? fh : "";
+        a[`dia_${dia}_observacion`] = (estado === "PRESENTE") ? obs : "";
+        a.estado_general = (a.dia_1 === "PRESENTE" || a.dia_2 === "PRESENTE" || a.dia_3 === "PRESENTE") ? "PRESENTE" : "Pendiente";
+
+        // 3. Guardar en LocalStorage
+        localStorage.setItem("asistentes_" + grupoActivoId, JSON.stringify(asistentes));
+
+        // 4. Actualizar Firebase si está conectado
+        if (firestoreDb) {
+          try {
+            const colName = (grupoActivoId === "gef_bermejo") ? "asistencia_gef_bermejo" : "asistencia_" + grupoActivoId;
+            await firestoreDb.collection(colName).doc(String(a.numero)).set({
+              numero: a.numero,
+              nombre: a.nombre,
+              institucion: a.institucion || "",
+              estado_general: a.estado_general,
+              [`dia_${dia}`]: estado,
+              [`dia_${dia}_fecha_hora`]: (estado === "PRESENTE") ? fh : "",
+              [`dia_${dia}_observacion`]: obs,
+              actualizado_en: firebase.firestore.FieldValue.serverTimestamp()
+            }, { merge: true });
+          } catch (fbErr) {
+            console.warn("Aviso Firebase:", fbErr);
+          }
+        }
+
+        // Mostrar en card de último escaneo
+        if (estado === "PRESENTE") {
+          document.getElementById("cardUltimoEscaneo").classList.remove("hidden");
+          document.getElementById("numUltimo").textContent = `#${a.numero}`;
+          document.getElementById("nombreUltimo").textContent = a.nombre;
+          document.getElementById("diaUltimo").textContent = `✓ Asistencia registrada Día ${dia}`;
+          document.getElementById("horaUltimo").textContent = `${pad(ahora.getHours())}:${pad(ahora.getMinutes())}`;
+        }
+
+        playBeepM(estado === "PRESENTE");
+        cerrarModalMovil();
+        actualizarMetricas();
+        renderCards(asistentes);
+      } catch (e) {
+        console.error("Error al registrar:", e);
+        alert("Aviso: " + e.message);
+      }
+    }
+
+    // Búsqueda Manual en pestaña Escáner
+    function buscarManualMovil(q) {
+      const box = document.getElementById("sugerenciasManual");
+      if (!q || !q.trim()) {
+        box.classList.add("hidden");
+        return;
+      }
+      const val = q.trim().toLowerCase();
+      const hits = asistentes.filter(a => 
+        String(a.numero) === val ||
+        (a.nombre && a.nombre.toLowerCase().includes(val)) ||
+        (a.institucion && a.institucion.toLowerCase().includes(val))
+      ).slice(0, 5);
+
+      if (hits.length === 0) {
+        box.innerHTML = `<div class="p-2.5 text-xs text-slate-500 italic">No se encontró asistente</div>`;
+      } else {
+        box.innerHTML = hits.map(a => `
+          <div onclick="seleccionarDeManual(${a.numero})" class="p-2.5 border-b border-slate-800 hover:bg-slate-800 cursor-pointer flex items-center justify-between text-xs">
+            <span class="text-white font-medium">#${a.numero} - ${a.nombre}</span>
+            <span class="text-[10px] text-teal-400 font-bold">${a.dia_1 === 'PRESENTE' ? '✓ D1' : ''}</span>
+          </div>
+        `).join("");
+      }
+      box.classList.remove("hidden");
+    }
+
+    function seleccionarDeManual(num) {
+      document.getElementById("sugerenciasManual").classList.add("hidden");
+      document.getElementById("inputBuscarManual").value = "";
+      const a = asistentes.find(x => x.numero === num);
+      if (a) abrirModalConfirmacionM(a);
+    }
+
+    // Render de Tarjetas Táctiles en Pestaña Asistentes
+    function renderCards(lista) {
+      const container = document.getElementById("listaCardsContainer");
+      container.innerHTML = "";
+
+      if (lista.length === 0) {
+        container.innerHTML = `<div class="p-6 text-center text-slate-500 text-xs italic bg-slate-900/50 rounded-xl">No hay participantes</div>`;
+        return;
+      }
+
+      lista.forEach(a => {
+        const renderBtnDia = (dia) => {
+          const est = a[`dia_${dia}`];
+          const fh = a[`dia_${dia}_fecha_hora`];
+          const horaCorta = fh ? (fh.split(" ")[1] || fh) : "";
+          if (est === "PRESENTE") {
+            return `
+              <button onclick="abrirModalModificarDia(${a.numero}, ${dia})" class="w-full min-h-[42px] p-1.5 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-center flex flex-col items-center justify-center">
+                <span class="text-[10px] font-bold text-emerald-300">✓ D${dia}</span>
+                <span class="text-[9px] text-emerald-200/90 font-medium">${horaCorta || "PRESENTE"}</span>
+              </button>
+            `;
+          } else {
+            return `
+              <button onclick="marcarRapidoM(${a.numero}, ${dia})" class="w-full min-h-[42px] p-1.5 rounded-xl bg-slate-950 border border-dashed border-slate-800 hover:border-emerald-500/50 text-center flex flex-col items-center justify-center text-slate-400">
+                <span class="text-[10px] font-medium">D${dia}</span>
+                <span class="text-[9px] text-slate-500 font-bold">+ Marcar</span>
+              </button>
+            `;
+          }
+        };
+
+        const card = document.createElement("div");
+        card.className = "p-3 rounded-2xl bg-slate-900/90 border border-slate-800/90 space-y-2.5 shadow-sm";
+        card.innerHTML = `
+          <div class="flex items-start justify-between gap-2">
+            <div class="flex items-start gap-2 min-w-0">
+              <span class="w-7 h-7 rounded-lg bg-blue-600/20 text-blue-400 font-bold text-xs flex items-center justify-center flex-shrink-0">
+                #${a.numero}
+              </span>
+              <div class="min-w-0">
+                <h4 class="font-bold text-white text-xs truncate">${a.nombre}</h4>
+                <p class="text-[10px] text-slate-400 truncate">${a.institucion || "-"}</p>
+              </div>
+            </div>
+            <span class="text-[9px] font-semibold px-2 py-0.5 rounded-full ${a.estado_general === 'PRESENTE' ? 'bg-teal-500/20 text-teal-300' : 'bg-slate-800 text-slate-500'}">
+              ${a.estado_general === 'PRESENTE' ? 'Asistió' : 'Pendiente'}
+            </span>
+          </div>
+
+          <div class="grid grid-cols-3 gap-1.5 pt-1 border-t border-slate-800/70">
+            ${renderBtnDia(1)}
+            ${renderBtnDia(2)}
+            ${renderBtnDia(3)}
+          </div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function marcarRapidoM(num, dia) {
+      const a = asistentes.find(x => x.numero === num);
+      if (a) {
+        diaSeleccionado = dia;
+        abrirModalConfirmacionM(a);
+      }
+    }
+
+    function abrirModalModificarDia(num, dia) {
+      const a = asistentes.find(x => x.numero === num);
+      if (a) {
+        diaSeleccionado = dia;
+        abrirModalConfirmacionM(a);
+      }
+    }
+
+    function filtrarListaMovil() {
+      const txt = (document.getElementById("filtroTexto").value || "").toLowerCase().trim();
+      const filtro = document.getElementById("filtroDia").value;
+
+      const res = asistentes.filter(a => {
+        const coincide = !txt ||
+          String(a.numero).includes(txt) ||
+          (a.nombre && a.nombre.toLowerCase().includes(txt)) ||
+          (a.institucion && a.institucion.toLowerCase().includes(txt));
+        if (!coincide) return false;
+
+        if (filtro === "presentes_dia1") return a.dia_1 === "PRESENTE";
+        if (filtro === "ausentes_dia1") return a.dia_1 !== "PRESENTE";
+        if (filtro === "presentes_dia2") return a.dia_2 === "PRESENTE";
+        if (filtro === "presentes_dia3") return a.dia_3 === "PRESENTE";
+        return true;
+      });
+
+      renderCards(res);
+      document.getElementById("txtTotalMostrados").textContent = `${res.length} de ${asistentes.length}`;
+    }
+
+    // Cambio de Pestañas Inferiores
+    function cambiarPestana(p) {
+      const tEsc = document.getElementById("tabEscaner");
+      const tAsi = document.getElementById("tabAsistentes");
+      const tRes = document.getElementById("tabResumen");
+
+      const bEsc = document.getElementById("btnTabEscaner");
+      const bAsi = document.getElementById("btnTabAsistentes");
+      const bRes = document.getElementById("btnTabResumen");
+
+      [tEsc, tAsi, tRes].forEach(t => t.classList.add("hidden"));
+      [bEsc, bAsi, bRes].forEach(b => {
+        b.className = "py-2 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-slate-200 transition";
+      });
+
+      if (p === "escaner") {
+        tEsc.classList.remove("hidden");
+        bEsc.className = "py-2 rounded-xl flex flex-col items-center justify-center text-blue-400 font-bold transition";
+        iniciarCamara();
+      } else if (p === "asistentes") {
+        tAsi.classList.remove("hidden");
+        bAsi.className = "py-2 rounded-xl flex flex-col items-center justify-center text-blue-400 font-bold transition";
+        renderCards(asistentes);
+      } else if (p === "resumen") {
+        tRes.classList.remove("hidden");
+        bRes.className = "py-2 rounded-xl flex flex-col items-center justify-center text-blue-400 font-bold transition";
+        actualizarMetricas();
+      }
+    }
+  </script>
+</body>
+</html>
+
