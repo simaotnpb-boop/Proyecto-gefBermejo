@@ -1,0 +1,11 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Permite lectura y escritura en todas las colecciones del sistema:
+    // - Asistencia de todos los grupos (asistencia_gef_bermejo, asistencia_<id_grupo>, etc.)
+    // - Configuración global de grupos en tiempo real (sistema_asistencia/configuracion)
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
